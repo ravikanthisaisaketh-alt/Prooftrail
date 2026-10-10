@@ -1,1 +1,35 @@
 @import "tailwindcss";
+
+:root { --blue: #2563eb; --blue-d: #1d4ed8; --blue-l: #dbeafe; --ink: #0f172a; --muted: #64748b; --line: #e2e8f0; --bg: #f1f5f9; --ok: #166534; --ok-l: #dcfce7; --amber: #fef3c7; --amber-d: #92400e; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.5; }
+.ny-top { background: #fff; border-bottom: 1px solid var(--line); }
+.ny-wrap { max-width: 820px; margin: 0 auto; padding: 0 20px; }
+.ny-top .ny-wrap { display: flex; justify-content: space-between; align-items: center; padding-top: 14px; padding-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+.ny-logo { font-weight: 700; font-size: 1.15rem; color: var(--blue-d); }
+.ny-nav { display: flex; gap: 6px; align-items: center; }
+.ny-nav a { color: var(--ink); text-decoration: none; padding: 6px 12px; border-radius: 999px; font-size: .92rem; transition: background .2s; }
+.ny-nav a:hover { background: var(--blue-l); } .ny-nav a[aria-current="page"] { background: var(--blue-l); color: var(--blue-d); font-weight: 600; }
+.ny-hero { background: linear-gradient(120deg, var(--blue-d), var(--blue)); color: #fff; }
+.ny-hero .ny-wrap { padding-top: 28px; padding-bottom: 28px; }
+.ny-hero h1 { margin: 4px 0 0; font-size: 1.8rem; letter-spacing: -.02em; } .ny-hero p { margin: 0; opacity: .9; }
+.ny-main { display: grid; gap: 16px; padding-top: 22px; padding-bottom: 64px; }
+.ny-card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 20px; box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 6px 20px rgba(15,23,42,.05); animation: slide-up .45s ease both; }
+.ny-card h2 { margin: 0 0 8px; font-size: 1.1rem; } .ny-card p { margin: 0 0 8px; }
+.muted { color: var(--muted); font-size: .88rem; }
+.ny-btn { display: inline-block; background: var(--blue); color: #fff; border: 0; border-radius: 10px; padding: 12px 22px; font-size: 1rem; font-weight: 600; text-decoration: none; cursor: pointer; box-shadow: 0 2px 6px rgba(37,99,235,.3); transition: transform .15s, background .2s; }
+.ny-btn:hover { background: var(--blue-d); transform: translateY(-1px); } .ny-btn:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.ny-link { background: none; border: 0; padding: 0; color: var(--blue-d); text-decoration: underline; cursor: pointer; font: inherit; font-size: .85rem; }
+.chip { display: inline-block; border-radius: 999px; padding: 2px 12px; font-size: .8rem; font-weight: 600; background: #e2e8f0; color: #334155; }
+.chip.ok { background: var(--ok-l); color: var(--ok); } .chip.warn { background: var(--amber); color: var(--amber-d); } .chip.blue { background: var(--blue-l); color: var(--blue-d); }
+.chip.pulse { animation: pulse 2s ease-in-out infinite; }
+.progress { height: 10px; background: var(--line); border-radius: 99px; overflow: hidden; } .progress > span { display: block; height: 100%; width: 100%; background: var(--blue); animation: grow 1s ease both; }
+.mods { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.mods li { display: flex; gap: 10px; align-items: center; opacity: 0; animation: fade-in .4s ease forwards; }
+.tick { width: 22px; height: 22px; border-radius: 50%; background: var(--ok-l); color: var(--ok); display: grid; place-items: center; font-size: .8rem; font-weight: 700; flex: none; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; } .level { font-size: 1.5rem; font-weight: 700; }
+.skill { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.skill:first-of-type { border-top: 0; }
+@keyframes fade-in { to { opacity: 1; } } @keyframes grow { from { width: 0; } }
+@keyframes slide-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(37,99,235,.4); } 50% { box-shadow: 0 0 0 7px rgba(37,99,235,0); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-delay: 0ms !important; transition-duration: .001ms !important; } .mods li { opacity: 1; } }

@@ -5,10 +5,13 @@ type Props = { id: string; level: string; status: string; mode: string; aiAssist
 export function Receipt({ id, level, status, mode, aiAssisted }: Props) {
   const verifyUrl = `${window.location.origin}/verify/${id}` // the QR holds only this link
   return (
-    <div className="rounded border p-4 space-y-2">
-      <div className="font-semibold">Receipt {id}</div>
-      <div>Level: {level} · Status: {status} · Conditions: {mode}</div>
-      {aiAssisted && <span className="text-sm rounded bg-amber-100 px-2 py-0.5">AI assisted</span>}
+    <div className="card row" style={{ justifyContent: 'space-between' }}>
+      <div>
+        <h2>Receipt {id}</h2>
+        <p>Level: {level} · Status: {status} · Conditions: {mode}</p>
+        {aiAssisted && <span className="chip warn">AI assisted</span>}{' '}
+        <a className="link" href={`/verify/${id}`}>Verify this receipt</a>
+      </div>
       <QRCodeSVG value={verifyUrl} size={96} />
     </div>
   )

@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>ProofTrail</title>
+    <script src="assets/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "Inter"; font-weight: 500; src: url("assets/fonts/inter-500.woff2") format("woff2"); }
+      @font-face { font-family: "Inter"; font-weight: 700; src: url("assets/fonts/inter-700.woff2") format("woff2"); }
+      @font-face { font-family: "Inter"; font-weight: 800; src: url("assets/fonts/inter-800.woff2") format("woff2"); }
+
+      :root {
+        --bg: #0b1115;
+        --surface: #131c22;
+        --line: #26343b;
+        --text: #e8f1f2;
+        --muted: #9db2b8;
+        --teal: #2dd4bf;
+        --teal-dim: #134e48;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 1920px; height: 1080px; overflow: hidden;
+        background: var(--bg); color: var(--text);
+        font-family: "Inter", sans-serif; font-weight: 500;
+      }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
+
+      /* persistent background */
+      .glow {
+        position: absolute; left: 1050px; top: -420px; width: 1100px; height: 1100px; border-radius: 50%;
+        background: radial-gradient(circle, rgba(45,212,191,0.16) 0%, rgba(45,212,191,0) 65%);
+      }
+      .glow2 {
+        position: absolute; left: -500px; top: 600px; width: 900px; height: 900px; border-radius: 50%;
+        background: radial-gradient(circle, rgba(45,212,191,0.07) 0%, rgba(45,212,191,0) 65%);
+      }
+      .progress { position: absolute; left: 0; bottom: 0; width: 1920px; height: 6px; background: #16222a; }
+      .progress i { display: block; width: 100%; height: 100%; background: var(--teal); transform-origin: left center; }
+
+      /* scene tag (top-left caption chip) */
+      .tag { position: absolute; left: 96px; top: 56px; width: 900px; height: 60px; }
+      .tag .tagin { display: flex; align-items: center; gap: 18px; font-size: 30px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--teal); }
+      .tag .tagin b { display: block; width: 44px; height: 4px; border-radius: 2px; background: var(--teal); }
+
+      /* screens */
+      .screen { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+      .wrap {
+        position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        padding: 130px 150px 230px; text-align: center;
+      }
+      .wrap.row { flex-direction: row; gap: 140px; text-align: left; padding-bottom: 230px; }
+      h1 { font-weight: 800; font-size: 128px; line-height: 1.04; letter-spacing: -0.035em; max-width: 1560px; }
+      h1.md { font-size: 108px; }
+      h1 .a { color: var(--teal); }
+      .cap {
+        position: absolute; left: 150px; width: 1620px; bottom: 112px; text-align: center;
+        font-size: 50px; font-weight: 500; color: var(--muted); letter-spacing: -0.01em;
+      }
+      .cap .a { color: var(--teal); }
+      .ico { width: 112px; height: 112px; margin-bottom: 44px; color: var(--teal); fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+      /* S2 */
+      .wordmark { display: flex; align-items: center; gap: 36px; }
+      .wordmark .ico { margin: 0; width: 150px; height: 150px; }
+      .receipt {
+        width: 560px; padding: 44px 48px; border-radius: 28px; background: var(--surface); border: 2px solid var(--line);
+        display: flex; flex-direction: column; gap: 26px;
+      }
+      .receipt .hd { display: flex; align-items: center; gap: 20px; padding-bottom: 26px; border-bottom: 2px solid var(--line); }
+      .receipt .hd svg { width: 64px; height: 64px; color: var(--teal); fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+      .receipt .hd i { display: block; height: 18px; width: 220px; border-radius: 9px; background: var(--teal); }
+      .receipt .ln { display: flex; align-items: center; gap: 22px; }
+      .receipt .ln s { display: block; width: 26px; height: 26px; border-radius: 8px; background: var(--teal-dim); border: 2px solid var(--teal); }
+      .receipt .ln i { display: block; height: 16px; border-radius: 8px; background: var(--line); }
+      .chips { display: flex; flex-wrap: wrap; gap: 26px 28px; justify-content: center; max-width: 1500px; margin-top: 56px; }
+      .chip {
+        font-size: 54px; font-weight: 700; letter-spacing: -0.02em; padding: 22px 44px; border-radius: 22px;
+        background: var(--surface); border: 2px solid var(--teal-dim); color: var(--text);
+      }
+      .toggles { display: flex; gap: 120px; margin-top: 56px; align-items: center; }
+      .tg { display: flex; flex-direction: column; align-items: center; gap: 28px; font-size: 54px; font-weight: 800; letter-spacing: -0.02em; }
+      .sw { position: relative; width: 240px; height: 120px; border-radius: 60px; border: 3px solid var(--line); background: var(--surface); }
+      .sw i { position: absolute; top: 12px; width: 90px; height: 90px; border-radius: 50%; background: var(--muted); }
+      .sw.on { background: var(--teal); border-color: var(--teal); }
+      .sw.on i { left: 132px; background: var(--bg); }
+      .sw.off i { left: 12px; }
+      .tg.on { color: var(--teal); }
+      .tg.off { color: var(--muted); }
+
+      /* S3 demo */
+      .demo-frame {
+        position: absolute; left: 96px; top: 150px; width: 1190px; height: 669px; border-radius: 28px;
+        border: 4px dashed var(--teal); background: repeating-linear-gradient(135deg, #0f1a1f 0 24px, #111e24 24px 48px);
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center;
+      }
+      .demo-frame .badge { padding: 10px 28px; border-radius: 999px; background: var(--teal); color: var(--bg); font-size: 28px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+      .demo-frame .big { font-size: 66px; font-weight: 800; letter-spacing: -0.03em; }
+      .demo-frame .sub { font-size: 40px; font-weight: 500; color: var(--muted); }
+      .demo-frame .play { width: 120px; height: 120px; color: var(--teal); fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+      .steps { text-align: left; position: absolute; left: 1350px; top: 150px; width: 500px; height: 669px; display: flex; flex-direction: column; justify-content: space-between; }
+      .step { display: flex; align-items: center; gap: 22px; opacity: 0.45; }
+      .step .n { flex: none; width: 56px; height: 56px; border-radius: 50%; border: 3px solid var(--teal); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; color: var(--teal); background: var(--bg); }
+      .step .t { font-size: 38px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; }
+      .step .t em { font-style: normal; color: var(--teal); }
+      .timebar { position: absolute; left: 96px; top: 850px; width: 1190px; height: 10px; border-radius: 5px; background: var(--line); }
+      .timebar i { display: block; width: 100%; height: 100%; border-radius: 5px; background: var(--teal); transform-origin: left center; }
+      .timelabel { position: absolute; left: 96px; top: 880px; width: 1190px; display: flex; justify-content: space-between; font-size: 30px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; }
+
+      /* S4 */
+      .flow { position: relative; width: 1500px; height: 500px; margin-top: -10px; }
+      .flow svg.lines { position: absolute; left: 0; top: 0; width: 1500px; height: 500px; fill: none; stroke: var(--teal); stroke-width: 5; stroke-linecap: round; }
+      .node {
+        position: absolute; display: flex; align-items: center; justify-content: center; height: 100px; border-radius: 22px;
+        background: var(--surface); border: 3px solid var(--line); font-size: 46px; font-weight: 800; letter-spacing: -0.02em;
+      }
+      .node.pt { background: var(--teal-dim); border-color: var(--teal); color: var(--text); }
+      .node.dash { border-style: dashed; }
+      .elabel { position: absolute; font-size: 36px; font-weight: 700; color: var(--teal); letter-spacing: 0.02em; }
+      .pipe { display: flex; align-items: flex-start; gap: 34px; margin-top: 10px; }
+      .pn { display: flex; flex-direction: column; align-items: center; gap: 26px; width: 240px; font-size: 40px; font-weight: 700; letter-spacing: -0.02em; }
+      .pn .c { width: 160px; height: 160px; border-radius: 50%; background: var(--surface); border: 3px solid var(--teal); display: flex; align-items: center; justify-content: center; }
+      .pn .c svg { width: 82px; height: 82px; color: var(--teal); fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+      .pa { width: 64px; height: 64px; margin-top: 48px; color: var(--muted); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .tiles { display: grid; grid-template-columns: repeat(3, 500px); gap: 36px; }
+      .tile { height: 230px; border-radius: 26px; background: var(--surface); border: 2px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; font-size: 44px; font-weight: 800; letter-spacing: -0.02em; }
+      .tile svg { width: 78px; height: 78px; color: var(--teal); fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+      .chain { display: flex; align-items: center; margin-top: 60px; }
+      .blk { width: 190px; height: 190px; border-radius: 28px; background: var(--surface); border: 3px solid var(--teal); display: flex; align-items: center; justify-content: center; font-size: 96px; font-weight: 800; color: var(--teal); }
+      .lnk { width: 72px; height: 6px; background: var(--teal); border-radius: 3px; }
+      .blk.valid { background: var(--teal); color: var(--bg); font-size: 48px; letter-spacing: 0.06em; width: 270px; }
+
+      /* S5 */
+      .stats { display: flex; gap: 48px; }
+      .stat { width: 510px; height: 440px; border-radius: 30px; background: var(--surface); border: 2px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+      .stat .v { font-size: 190px; font-weight: 800; letter-spacing: -0.05em; color: var(--teal); line-height: 1; }
+      .stat .l { font-size: 44px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+      .duo { display: flex; gap: 56px; }
+      .col { width: 760px; height: 420px; border-radius: 30px; padding: 56px; display: flex; flex-direction: column; justify-content: center; gap: 28px; text-align: left; background: var(--surface); border: 2px solid var(--line); }
+      .col .k { font-size: 34px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--teal); }
+      .col .d { font-size: 70px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.08; }
+      .col.real { border-color: var(--teal); background: var(--teal-dim); }
+      .col.sim { border-style: dashed; }
+      .col.sim .k { color: var(--muted); }
+      .rows { display: flex; flex-direction: column; gap: 30px; align-items: flex-start; margin-top: 54px; }
+      .rowi { display: flex; align-items: center; gap: 30px; font-size: 76px; font-weight: 800; letter-spacing: -0.03em; text-align: left; }
+      .rowi i { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--teal); }
+      .kick { font-size: 36px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--teal); }
+      .final-mark { display: flex; align-items: center; gap: 36px; margin-bottom: 48px; font-size: 96px; font-weight: 800; letter-spacing: -0.04em; }
+      .final-mark .ico { margin: 0; width: 120px; height: 120px; }
+    </style>
+  </head>
+  <body>
+    <!-- icon sprite -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <defs>
+        <symbol id="i-badge" viewBox="0 0 24 24"><circle cx="12" cy="9" r="6"/><path d="M8.5 14l-1.5 8 5-3 5 3-1.5-8"/></symbol>
+        <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
+        <symbol id="i-code" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></symbol>
+        <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 6l2 2 3-3M4 14l2 2 3-3M12 7h8M12 15h8"/></symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/></symbol>
+        <symbol id="i-quote" viewBox="0 0 24 24"><path d="M6 7h4v5a4 4 0 0 1-4 4M14 7h4v5a4 4 0 0 1-4 4"/></symbol>
+        <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17.5 14c2.5 0 4 1.7 4 4.5"/></symbol>
+        <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+        <symbol id="i-toggle" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="5"/><circle cx="16" cy="12" r="2.5"/></symbol>
+        <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+        <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4h12l-2 4 2 4H5"/></symbol>
+        <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+        <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+      </defs>
+    </svg>
+
+    <div id="root" data-composition-id="main" data-start="0" data-duration="120" data-width="1920" data-height="1080">
+      <div class="glow" id="glow"></div>
+      <div class="glow2"></div>
+
+      <!-- scene tags -->
+      <div class="tag clip" data-start="0" data-duration="15" data-track-index="1"><div class="tagin"><b></b>01 Problem</div></div>
+      <div class="tag clip" data-start="15" data-duration="20" data-track-index="1"><div class="tagin"><b></b>02 Solution</div></div>
+      <div class="tag clip" data-start="35" data-duration="45" data-track-index="1"><div class="tagin"><b></b>03 Live demo</div></div>
+      <div class="tag clip" data-start="80" data-duration="20" data-track-index="1"><div class="tagin"><b></b>04 How we solve it</div></div>
+      <div class="tag clip" data-start="100" data-duration="20" data-track-index="1"><div class="tagin"><b></b>05 Impact and next steps</div></div>
+
+      <!-- ===== SCENE 1: PROBLEM 0:00–0:15 ===== -->
+      <section class="screen clip" data-start="0" data-duration="3.75" data-track-index="2">
+        <div class="wrap">
+          <svg class="ico r"><use href="#i-badge"/></svg>
+          <h1 class="r">Badges show you <span class="a">finished.</span></h1>
+          <div class="cap r">Not that you can do the work.</div>
+        </div>
+      </section>
+      <section class="screen clip" data-start="3.75" data-duration="3.75" data-track-index="2">
+        <div class="wrap">
+          <svg class="ico r"><use href="#i-search"/></svg>
+          <h1 class="r">Employers can’t <span class="a">verify</span> them.</h1>
+          <div class="cap r">No portable, trustworthy proof.</div>
+        </div>
+      </section>
+      <section class="screen clip" data-start="7.5" data-duration="3.75" data-track-index="2">
+        <div class="wrap">
+          <svg class="ico r"><use href="#i-copy"/></svg>
+          <h1 class="r">Tests can be <span class="a">gamed.</span></h1>
+          <div class="cap r">Copy-paste. Tab switching. Leaked answers.</div>
+        </div>
+      </section>
+      <section class="screen clip" data-start="11.25" data-duration="3.75" data-track-index="2">
+        <div class="wrap">
+          <svg class="ico r"><use href="#i-alert"/></svg>
+          <h1 class="r">Can’t challenge <span class="a">unfair</span> grading.</h1>
+          <div class="cap r">Results shared without clear control.</div>
+        </div>
+      </section>
+
+      <!-- ===== SCENE 2: SOLUTION 0:15–0:35 ===== -->
+      <section class="screen clip" data-start="15" data-duration="5" data-track-index="2">
+        <div class="wrap">
+          <div class="wordmark r"><svg class="ico"><use href="#i-shield"/></svg><h1>Proof<span class="a">Trail</span></h1></div>
+          <div class="cap r">A real, working skill-test and evidence platform.</div>
+        </div>
+      </section>
+      <section class="screen clip" data-start="20" data-duration="5" data-track-index="2">
+        <div class="wrap row">
+          <div>
+            <h1 class="md r">Every attempt gets a <span class="a">receipt.</span></h1>
+          </div>
+          <div class="receipt r">
+            <div class="hd"><svg><use href="#i-shield"/></svg><i></i></div>
+            <div class="ln"><s></s><i style="width:300px"></i></div>
+            <div class="ln"><s></s><i style="width:240px"></i></div>
+            <div class="ln"><s></s><i style="width:330px"></i></div>
+            <div class="ln"><s></s><i style="width:200px"></i></div>
+            <div class="ln"><s></s><i style="width:280px"></i></div>
+          </div>
+          <div class="cap r">A verifiable receipt for each attempt.</div>
+        </div>
+      </section>
+      <section class="screen clip" data-start="25" data-duration="5" data-track-index="2">
+        <div class="wrap">
+          <h1 class="md r">Inside every <span class="a">receipt</span></h1>
+          <div class="chips">
+            <div class="chip r">Task</div>
+            <div class="chip r">Rubric version</div>
+            <div class="chip r">Per-criterion results</div>
+            <div class="chip r">Level</div>
+            <div class="chip r">Status</div>
+            <div class="chip r">Evidence</div>
+          </div>
+        </div>
+      </section>
+      <section class="screen clip" data-start="30" data-duration="5" data-track-index="2">
+        <div class="wrap">
+          <h1 class="md r">You decide who <span class="a">sees it.</span></h1>
+          <div class="toggles r">
+            <div class="tg on"><div class="sw on"><i></i></div>Consent ON</div>
+            <div class="tg off"><div class="sw off"><i></i></div>Consent OFF</div>
+          </div>
+          <div class="cap r">Revocable anytime.</div>
+        </div>
+      </section>
+
+      <!-- ===== SCENE 3: LIVE DEMO 0:35–1:20 (45 s placeholder) ===== -->
+      <!--
+        DEMO SLOT: replace the placeholder box (#demo-slot) with your screen recording.
+        Put the file at assets/demo.mp4 and swap the placeholder for:
+          <video id="demo-video" class="clip" src="assets/demo.mp4" data-start="35" data-duration="45" data-track-index="5" muted playsinline
+                 style="position:absolute;left:96px;top:150px;width:1190px;height:669px;object-fit:cover;border-radius:28px"></video>
+        (use data-volume / remove "muted" if the recording has narration; the music bed already dips to 0.10 here)
+      -->
+      <section class="screen clip" data-start="35" data-duration="45" data-track-index="2" id="s3">
+        <div class="wrap" style="padding:0">
+          <div class="demo-frame" id="demo-slot">
+            <svg class="play"><use href="#i-play"/></svg>
+            <div class="badge">Placeholder</div>
+            <div class="big">Screen recording goes here</div>
+            <div class="sub">45 seconds · 0:35 → 1:20</div>
+          </div>
+          <div class="timebar"><i id="demo-bar"></i></div>
+          <div class="timelabel"><span>0:35</span><span>1:20</span></div>
+          <div class="steps" id="steps">
+            <div class="step"><div class="n">1</div><div class="t">Nyeras</div></div>
+            <div class="step"><div class="n">2</div><div class="t">Prove your skill</div></div>
+            <div class="step"><div class="n">3</div><div class="t">Attempt</div></div>
+            <div class="step"><div class="n">4</div><div class="t">Consent <em>ON</em> or <em>OFF</em></div></div>
+            <div class="step"><div class="n">5</div><div class="t">Nyeras profile always updates</div></div>
+            <div class="step"><div class="n">6</div><div class="t">NxtMove shows it only if <em>ON</em></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== SCENE 4: HOW WE SOLVE IT 1:20–1:40 ===== -->
+      <section class="screen clip" data-start="80" data-duration="5" data-track-index="2">
+        <div class="wrap">
+          <div class="flow">
+            <svg class="lines" viewBox="0 0 1500 500">
+              <path id="l1" d="M300 250 L560 250" pathLength="1" />
+              <path id="l2" d="M920 250 C1020 250 1020 80 1120 80" pathLength="1" />
+              <path id="l3" d="M920 250 C1020 250 1020 420 1120 420" pathLength="1" />
+            </svg>
+            <div class="node r" style="left:0;top:200px;width:300px">Nyeras</div>
+            <div class="node pt r" style="left:560px;top:200px;width:360px">ProofTrail</div>
+            <div class="node r" style="left:1120px;top:30px;width:380px">Nyeras profile</div>
+            <div class="node dash r" style="left:1120px;top:370px;width:380px">NxtMove</div>
+            <div class="elabel r" style="left:890px;top:95px">always</div>
+            <div class="elabel r" style="left:890px;top:395px">if ON</div>
+          </div>
+          <div class="cap r">Three sites. One backend.</div>
+        </div>
+      </section>
+      <section class="screen clip" data-start="85" data-duration="5" data-track-index="2">
+        <div class="wrap">
+          <div class="pipe">
+            <div class="pn r"><div class="c"><svg><use href="#i-code"/></svg></div>Attempt</div>
+            <svg class="pa r"><use href="#i-chev"/></svg>
+            <div class="pn r"><div class="c"><svg><use href="#i-list"/></svg></div>Hidden tests</div>
+            <svg class="pa r"><use href="#i-chev"/></svg>
+            <div class="pn r"><div class="c"><svg><use href="#i-quote"/></svg></div>AI checks</div>
+            <svg class="pa r"><use href="#i-chev"/></svg>
+            <div class="pn r"><div class="c"><svg><use href="#i-people"/></svg></div>Humans</div>
+            <svg class="pa r"><use href="#i-chev"/></svg>
+            <div class="pn r"><div class="c"><svg><use href="#i-link"/></svg></div>Audit log</div>
+          </div>
+          <div class="cap r">Low-confidence cases go to humans.</div>
+        </div>
+      </section>
+      <section class="screen clip" data-start="90" data-duration="5" data-track-index="2">
+        <div class="wrap">
+          <div class="tiles">
+            <div class="tile r"><svg><use href="#i-eye"/></svg>Focus mode</div>
+            <div class="tile r"><svg><use href="#i-quote"/></svg>Quote guard</div>
+            <div class="tile r"><svg><use href="#i-flag"/></svg>Appeals</div>
+            <div class="tile r"><svg><use href="#i-eyeoff"/></svg>Blind review</div>
+            <div class="tile r"><svg><use href="#i-toggle"/></svg>Revocable consent</div>
+            <div class="tile r"><svg><use href="#i-target"/></svg>Attack the Grader</div>
+          </div>
+        </div>
+      </section>
+      <section class="screen clip" data-start="95" data-duration="5" data-track-index="2">
+        <div class="wrap">
+          <h1 class="md r">Hash-chained <span class="a">audit log</span></h1>
+          <div class="chain">
+            <div class="blk r">#</div><div class="lnk r"></div>
+            <div class="blk r">#</div><div class="lnk r"></div>
+            <div class="blk r">#</div><div class="lnk r"></div>
+            <div class="blk r">#</div><div class="lnk r"></div>
+            <div class="blk valid r">VALID</div>
+          </div>
+          <div class="cap r">Public Verify page.</div>
+        </div>
+      </section>
+
+      <!-- ===== SCENE 5: IMPACT, LIMITS, NEXT STEPS 1:40–2:00 ===== -->
+      <section class="screen clip" data-start="100" data-duration="5" data-track-index="2">
+        <div class="wrap">
+          <div class="stats">
+            <div class="stat r"><div class="v" id="n25">25</div><div class="l">backend tests passing</div></div>
+            <div class="stat r"><div class="v" style="font-size:136px;padding:27px 0">VALID</div><div class="l">audit log verified</div></div>
+            <div class="stat r"><div class="v">3</div><div class="l">sites, one backend</div></div>
+          </div>
+        </div>
+      </section>
+      <section class="screen clip" data-start="105" data-duration="4" data-track-index="2">
+        <div class="wrap">
+          <div class="duo">
+            <div class="col real r"><div class="k">Real</div><div class="d">ProofTrail backend and frontend</div></div>
+            <div class="col sim r"><div class="k">Simulated</div><div class="d">Nyeras and NxtMove</div></div>
+          </div>
+          <div class="cap r">Labelled as such.</div>
+        </div>
+      </section>
+      <section class="screen clip" data-start="109" data-duration="4" data-track-index="2">
+        <div class="wrap">
+          <div class="kick r">Limits</div>
+          <div class="rows">
+            <div class="rowi r"><i></i>AI-judged criteria show Pending</div>
+            <div class="rowi r"><i></i>Dashboards not built yet</div>
+            <div class="rowi r"><i></i>Sample data only</div>
+          </div>
+        </div>
+      </section>
+      <section class="screen clip" data-start="113" data-duration="3.5" data-track-index="2">
+        <div class="wrap">
+          <div class="kick r">Next steps</div>
+          <div class="rows">
+            <div class="rowi r"><i></i>Connect a model</div>
+            <div class="rowi r"><i></i>Reviewer dashboard, quality metrics</div>
+            <div class="rowi r"><i></i>Real college pilot</div>
+          </div>
+        </div>
+      </section>
+      <section class="screen clip" data-start="116.5" data-duration="3.5" data-track-index="2" id="sfinal">
+        <div class="wrap">
+          <div class="final-mark r"><svg class="ico"><use href="#i-shield"/></svg><span>Proof<span style="color:var(--teal)">Trail</span></span></div>
+          <h1 class="md r">A badge is not a skill.<br /><span class="a">A receipt is evidence.</span></h1>
+        </div>
+      </section>
+
+      <div class="progress"><i id="pbar"></i></div>
+
+      <audio
+        id="bgm" src="assets/music/bgm.mp3" data-start="0" data-duration="120" data-track-index="9" data-volume="1"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":0},{"t":1.5,"v":0.3},{"t":34,"v":0.3},{"t":36,"v":0.1},{"t":79,"v":0.1},{"t":81.5,"v":0.28},{"t":116.5,"v":0.28},{"t":119.8,"v":0}]}]}'
+      ></audio>
+    </div>
+
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      const EASE_IN = "power3.out";
+      const EASE_OUT = "power2.in";
+      const num = (el, a) => parseFloat(el.getAttribute(a));
+
+      // persistent: progress + drifting glow
+      tl.fromTo("#pbar", { scaleX: 0 }, { scaleX: 1, duration: 120, ease: "none" }, 0);
+      tl.fromTo("#glow", { x: 0, y: 0 }, { x: -380, y: 140, duration: 120, ease: "none" }, 0);
+
+      // scene tags: fade + slide
+      document.querySelectorAll(".tag").forEach((el) => {
+        const s = num(el, "data-start"), d = num(el, "data-duration");
+        const inner = el.querySelector(".tagin");
+        tl.fromTo(inner, { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.6, ease: EASE_IN }, s + 0.1);
+        tl.to(inner, { opacity: 0, x: 30, duration: 0.35, ease: EASE_OUT }, s + d - 0.35);
+      });
+
+      // screens: slide in from right, staggered children, fade + slide out left
+      const screens = document.querySelectorAll(".screen");
+      screens.forEach((el, si) => {
+        const s = num(el, "data-start"), d = num(el, "data-duration");
+        const wrap = el.querySelector(".wrap");
+        const last = si === screens.length - 1;
+        tl.fromTo(wrap, { opacity: 0, x: 70 }, { opacity: 1, x: 0, duration: 0.65, ease: EASE_IN }, s + 0.05);
+        el.querySelectorAll(".r").forEach((c, i) => {
+          tl.fromTo(c, { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.5, ease: EASE_IN }, s + 0.15 + i * 0.16);
+        });
+        if (!last) tl.to(wrap, { opacity: 0, x: -70, duration: 0.35, ease: EASE_OUT }, s + d - 0.35);
+      });
+
+      // S3: demo — step highlighting across the 45 s window (35 -> 80)
+      const stepTimes = [36, 41.5, 47, 54, 63, 71.5];
+      const steps = document.querySelectorAll("#steps .step");
+      steps.forEach((st, i) => {
+        const n = st.querySelector(".n");
+        tl.to(st, { opacity: 1, x: 14, duration: 0.45, ease: EASE_IN }, stepTimes[i]);
+        tl.to(n, { backgroundColor: "#2dd4bf", color: "#0b1115", duration: 0.35 }, stepTimes[i]);
+        if (i < steps.length - 1) tl.to(st, { opacity: 0.7, x: 0, duration: 0.4 }, stepTimes[i + 1]);
+      });
+      tl.fromTo("#demo-bar", { scaleX: 0 }, { scaleX: 1, duration: 45, ease: "none" }, 35);
+
+      // S4a: connector lines draw
+      ["#l1", "#l2", "#l3"].forEach((id, i) => {
+        tl.fromTo(id, { strokeDasharray: 1, strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.8, ease: "power2.inOut" }, 80 + 0.8 + i * 0.35);
+      });
+
+      // S5a: counter
+      const counter = { v: 0 };
+      const n25 = document.getElementById("n25");
+      tl.to(counter, { v: 25, duration: 1.1, ease: "power2.out", onUpdate: () => { n25.textContent = Math.round(counter.v); } }, 100.4);
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

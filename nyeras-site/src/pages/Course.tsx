@@ -1,25 +1,24 @@
-import { SimBanner } from '../components/SimBanner'
-import { course, learner } from '../seed'
+import { Shell } from '../components/Shell'
+import { course } from '../seed'
 import { proveUrl } from '../lib'
 
 export default function Course() {
   return (
-    <div>
-      <SimBanner name="Nyeras" />
-      <main className="mx-auto max-w-xl p-6 space-y-4">
-        <p className="text-sm text-gray-600">Learning platform (simulated) · {learner.label} · <a className="underline" href="/profile">My profile</a></p>
-        <h1 className="text-2xl font-bold">{course.title}</h1>
-        <div className="rounded bg-green-100 p-2">Progress 100% · Course completed</div>
-        <ul className="list-disc pl-6">{course.modules.map((m) => <li key={m}>✓ {m}</li>)}</ul>
-        <p className="text-sm">A completion badge shows you finished the lessons. It does not show what you can do.</p>
-        <section className="rounded border p-4 space-y-2">
-          <h2 className="font-semibold">Prove your skill</h2>
-          <p>Try a short, realistic task. You get feedback on each criterion, and you choose who sees the result.</p>
-          <a className="inline-block rounded bg-black px-4 py-2 text-white"
-             href={proveUrl}>Start a ProofTrail task</a>
-          <p className="text-xs text-gray-600">ProofTrail is the real prototype. This page is simulated.</p>
-        </section>
-      </main>
-    </div>
+    <Shell page="course" title={course.title} subtitle="Course completed">
+      <section className="ny-card">
+        <div className="row" style={{ justifyContent: 'space-between' }}><b>Progress 100%</b><span className="chip ok">Course completed</span></div>
+        <div className="progress" style={{ margin: '10px 0 16px' }}><span /></div>
+        <ul className="mods">
+          {course.modules.map((m, i) => <li key={m} style={{ animationDelay: `${i * 120}ms` }}><span className="tick">✓</span>{m}</li>)}
+        </ul>
+        <p className="muted" style={{ marginTop: 14 }}>A completion badge shows you finished the lessons. It does not show what you can do.</p>
+      </section>
+      <section className="ny-card">
+        <h2>Prove your skill</h2>
+        <p>Try a short, realistic task. You get feedback on each criterion, and you choose who sees the result.</p>
+        <a className="ny-btn" href={proveUrl}>Start a ProofTrail task</a>
+        <p className="muted" style={{ marginTop: 10 }}>ProofTrail is the real prototype. This page is simulated.</p>
+      </section>
+    </Shell>
   )
 }

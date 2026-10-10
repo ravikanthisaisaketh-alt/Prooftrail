@@ -1,7 +1,7 @@
 """FastAPI routes. Thin on purpose: real work lives in pipeline.py, audit.py, consent.py."""
 from contextlib import asynccontextmanager
 from typing import Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from . import db, config, audit, pipeline
@@ -105,6 +105,12 @@ def profile_summary(learner: str, role: str = "jr-data-analyst"):
             "skills": [{"skill": r["skill"], "level": r["level"], "status": r["status"]} for r in rows]}
 
 
+@app.get("/learners/{learner}/attempts")
+def attempts_used(learner: str):
+    c = db.conn(); n = c.execute("SELECT COUNT(*) FROM attempts WHERE learner=?", (learner,)).fetchone()[0]; c.close()
+    return {"used": n, "cap": config.ATTEMPT_CAP, "left": max(0, config.ATTEMPT_CAP - n)}
+
+
 @app.post("/dev/reset/{learner}")
 def dev_reset_learner(learner: str):
     """Demo helper: clear one learner's attempts, results and consent so the demo can be repeated."""
@@ -155,8 +161,9 @@ def consent_history(learner: str, role: str = "jr-data-analyst"):
 
 @app.get("/candidates")
 def candidates(role: str = "jr-data-analyst", skill: Optional[str] = None,
-               min_level: Optional[str] = None, status: Optional[str] = None):
-    return {"candidates": consent.candidates(role, skill, min_level, status)}
+               min_level: Optional[str] = None, status: Optional[str] = None,
+               recent_days: Optional[int] = None, conditions: Optional[str] = Query(default=None, pattern="^(Open|Focus)$")):
+    return {"candidates": consent.candidates(role, skill, min_level, status, recent_days, conditions)}
 
 @app.get("/candidates/{learner}/receipt")
 def candidate_receipt(learner: str, skill: str, role: str = "jr-data-analyst"):

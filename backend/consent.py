@@ -1,4 +1,5 @@
 """Consent: OFF by default. Recruiter routes call is_on() on EVERY request."""
+import datetime
 from . import db
 
 LEVEL_ORDER = {"Not yet": 0, "Developing": 1, "Proficient": 2}
@@ -25,7 +26,8 @@ def history(learner: str) -> list[dict]:
     return rows
 
 
-def candidates(role: str, skill: str | None, min_level: str | None, status: str | None) -> list[dict]:
+def candidates(role: str, skill: str | None, min_level: str | None, status: str | None,
+               recent_days: int | None = None, conditions: str | None = None) -> list[dict]:
     """Only consented learners. Neutral order (by learner id). No score, no rank.
     Deliberately returns NO accommodations and NO focus or paste counts."""
     c = db.conn()
@@ -40,6 +42,10 @@ def candidates(role: str, skill: str | None, min_level: str | None, status: str 
             if min_level and LEVEL_ORDER[p["level"]] < LEVEL_ORDER[min_level]:
                 continue
             if status and p["status"] != status:
+                continue
+            if conditions and p["mode"] != conditions:
+                continue
+            if recent_days is not None and (datetime.date.today() - datetime.date.fromisoformat(p["last_attempt"])).days > recent_days:
                 continue
             skills.append({"skill": p["skill"], "level": p["level"], "status": p["status"],
                            "confidence": p["confidence"], "last_attempt": p["last_attempt"], "mode": p["mode"]})

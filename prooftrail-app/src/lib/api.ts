@@ -29,6 +29,17 @@ export const api = {
   challenge: (text: string) =>
     call<{ thin: boolean; instruction_like: boolean; ai: { result: string } | null; would_route_to: string }>(
       '/challenge/try', { method: 'POST', body: JSON.stringify({ text }) }),
+  attemptsLeft: (learner: string) => call<{ used: number; cap: number; left: number }>(`/learners/${learner}/attempts`),
+  resetLearner: (learner: string) => call(`/dev/reset/${learner}`, { method: 'POST' }),
+  explainQuestions: (id: number) => call<{ questions: { id: string; text?: string; question?: string }[] }>(`/attempts/${id}/explainback`),
+  explainSubmit: (id: number, answers: Record<string, string>) =>
+    call<{ outcome: string; message: string }>(`/attempts/${id}/explainback`, { method: 'POST', body: JSON.stringify({ answers }) }),
+  reviewQueue: () => call<{ queue: { review_id: number; criterion: string; text: string }[] }>('/review/queue'),
+  decide: (rid: number, reviewer: string, decision: 'yes' | 'no', reason: string) =>
+    call<{ level: string }>(`/review/${rid}/decide`, { method: 'POST', body: JSON.stringify({ reviewer, decision, reason }) }),
+  appeal: (attempt_id: number, criterion: 'C3' | 'C5') => call<{ review_id: number }>('/appeals', { method: 'POST', body: JSON.stringify({ attempt_id, criterion }) }),
+  audit: () => call<{ rows: { id: number; event: string; attempt: number | null; actor: string; created: string; fingerprint: string }[] }>('/audit'),
+  quality: () => call<{ checked: number; sent_to_review: number; review_rate_pct: number | null; note: string }>('/quality/review-rate'),
   setConsent: (learner: string, role: string, on: boolean) =>
     call('/consent', { method: 'POST', body: JSON.stringify({ learner, role, on }) }),
 }
