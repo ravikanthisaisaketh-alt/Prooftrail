@@ -6,7 +6,8 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS learners(id TEXT PRIMARY KEY, display_label TEXT);
 CREATE TABLE IF NOT EXISTS attempts(
   id INTEGER PRIMARY KEY AUTOINCREMENT, learner TEXT, attempt_no INTEGER, mode TEXT,
-  tools_declared TEXT, code TEXT, text TEXT, created TEXT DEFAULT CURRENT_TIMESTAMP);
+  tools_declared TEXT, code TEXT, text TEXT, created TEXT DEFAULT CURRENT_TIMESTAMP,
+  task TEXT DEFAULT 't1');
 CREATE TABLE IF NOT EXISTS criterion_results(
   id INTEGER PRIMARY KEY AUTOINCREMENT, attempt INTEGER, criterion TEXT,
   result TEXT, source TEXT, category TEXT);
@@ -23,7 +24,7 @@ CREATE TABLE IF NOT EXISTS reviews(
   decision TEXT, reason TEXT, created TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS consents(
   id INTEGER PRIMARY KEY AUTOINCREMENT, learner TEXT, role TEXT, on_off INTEGER,
-  changed TEXT DEFAULT CURRENT_TIMESTAMP);
+  changed TEXT DEFAULT CURRENT_TIMESTAMP, task TEXT DEFAULT 't1');
 CREATE TABLE IF NOT EXISTS accommodations(learner TEXT, type TEXT);
 CREATE TABLE IF NOT EXISTS profiles(
   learner TEXT, skill TEXT, level TEXT, status TEXT, confidence TEXT, mode TEXT,
@@ -31,6 +32,9 @@ CREATE TABLE IF NOT EXISTS profiles(
 CREATE TABLE IF NOT EXISTS audit_log(
   id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT, attempt INTEGER, actor TEXT, data TEXT,
   versions TEXT, prev TEXT, fingerprint TEXT, created TEXT DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS users(
+  id TEXT PRIMARY KEY, name TEXT, email TEXT UNIQUE, pw_hash TEXT);
+CREATE TABLE IF NOT EXISTS progress(learner TEXT, course TEXT, done INTEGER, PRIMARY KEY(learner, course));
 """
 
 
@@ -46,7 +50,11 @@ def reset() -> None:
     for n in names:
         c.execute(f"DROP TABLE IF EXISTS {n}")
     c.executescript(SCHEMA)
-    for i in (1, 2):
-        c.execute("INSERT INTO learners VALUES(?,?)", (f"L-00{i}", f"Learner L-00{i}"))
+    from . import auth
+    for u in auth.DEMO_USERS:
+        c.execute("INSERT INTO learners VALUES(?,?)", (u["id"], f"Learner {u['id']}"))
+        c.execute("INSERT INTO users VALUES(?,?,?,?)", (u["id"], u["name"], u["email"], auth.hash_password(u["password"])))
+        for course, done in u["progress"].items():
+            c.execute("INSERT INTO progress VALUES(?,?,?)", (u["id"], course, done))
     c.commit()
     c.close()

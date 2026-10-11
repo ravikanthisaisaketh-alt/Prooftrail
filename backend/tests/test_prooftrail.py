@@ -243,3 +243,150 @@ def test_review_rate(client):
     submit(client, FIXED, good_text())
     r = client.get("/quality/review-rate").json()
     assert r["checked"] == 1 and r["sent_to_review"] == 1 and r["review_rate_pct"] == 100.0
+
+
+# ---- authentication ----
+def _login(client, who="L-001", pw="demo-pass-1"):
+    return client.post("/auth/login", json={"login": who, "password": pw})
+
+def test_login_ok_and_me(client):
+    r = _login(client)
+    assert r.status_code == 200
+    tok = r.json()["token"]
+    me = client.get("/auth/me", headers={"Authorization": f"Bearer {tok}"}).json()
+    assert me["learner"] == "L-001" and me["name"]
+    assert _login(client, "asha@demo.test").status_code == 200      # email works too
+
+def test_wrong_password_401_and_rate_limit(client):
+    assert _login(client, pw="nope").status_code == 401
+    assert _login(client, "nobody", "x").status_code == 401
+    for _ in range(4):
+        _login(client, pw="nope")
+    assert _login(client, pw="nope").status_code == 429
+    assert _login(client).status_code == 429                         # even the right password waits
+
+def test_passwords_are_hashed(client):
+    c = db.conn(); rows = [r["pw_hash"] for r in c.execute("SELECT pw_hash FROM users")]; c.close()
+    assert rows and all("demo-pass" not in h and "$" in h for h in rows)
+
+def test_token_required_and_scoped(client, monkeypatch):
+    monkeypatch.setattr(config, "DEMO_MODE", False)
+    assert client.get("/profile/L-001").status_code == 401           # no token
+    assert client.get("/profile/L-001", headers={"Authorization": "Bearer junk"}).status_code == 401
+    tok = _login(client).json()["token"]
+    h = {"Authorization": f"Bearer {tok}"}
+    assert client.get("/profile/L-001", headers=h).status_code == 200
+    assert client.get("/profile/L-002", headers=h).status_code == 403   # someone else's data
+    assert client.post("/consent", json={"learner": "L-002", "role": "jr-data-analyst", "on": True}, headers=h).status_code == 403
+
+def test_expired_token_rejected(client, monkeypatch):
+    from backend import auth
+    monkeypatch.setattr(config, "DEMO_MODE", False)
+    tok = auth.make_token("L-001", ttl=-1)
+    assert client.get("/auth/me", headers={"Authorization": f"Bearer {tok}"}).status_code == 401
+
+def test_handoff_single_use_and_not_an_access_token(client, monkeypatch):
+    monkeypatch.setattr(config, "DEMO_MODE", False)
+    tok = _login(client).json()["token"]
+    ho = client.post("/auth/handoff", headers={"Authorization": f"Bearer {tok}"}).json()["handoff"]
+    assert client.get("/auth/me", headers={"Authorization": f"Bearer {ho}"}).status_code == 401   # handoff is not a session
+    assert client.post("/auth/exchange", json={"handoff": ho}).status_code == 200
+    assert client.post("/auth/exchange", json={"handoff": ho}).status_code == 401                 # single use
+    assert client.post("/auth/exchange", json={"handoff": tok}).status_code == 401                # access token is not a handoff
+
+
+# ---- extra tasks: text cleaning (t2) and duplicate ids (t3) ----
+from backend.tasks import TASKS
+from backend.grader import text_task, dups_task
+
+T2_FIXED = 'def normalize_text(text):\n    if text is None:\n        return ""\n    return " ".join(text.split()).lower()\n'
+T3_FIXED = '''def find_duplicate_ids(records):
+    seen, dups = set(), set()
+    for r in records:
+        i = r.get("id")
+        if i is None:
+            continue
+        if i in seen:
+            dups.add(i)
+        seen.add(i)
+    return sorted(dups)
+'''
+
+def test_t2_reference_passes_and_broken_fails():
+    v = text_task.variant_for("L-001")
+    assert text_task.check_c1(T2_FIXED, v, 5)["pass"] and text_task.check_c2(T2_FIXED, 5)["pass"]
+    starter = TASKS["t2"]["starter"]
+    assert not text_task.check_c1(starter, v, 5)["pass"]            # inner spaces left as is
+    assert text_task.check_c2(starter, 5)["category"].startswith("edge_case_")   # None crashes
+
+def test_t2_empty_and_none_inputs():
+    from backend.grader.generic import run_generic
+    out = run_generic(T2_FIXED, "normalize_text", "each", [None, "", "   "], 5)
+    assert out["ok"] and out["result"] == ["", "", ""]
+
+def test_t3_reference_passes_and_broken_fails():
+    v = dups_task.variant_for("L-001")
+    assert dups_task.check_c1(T3_FIXED, v, 5)["pass"] and dups_task.check_c2(T3_FIXED, 5)["pass"]
+    starter = TASKS["t3"]["starter"]
+    assert not dups_task.check_c1(starter, v, 5)["pass"]            # repeated duplicates listed many times
+    assert dups_task.check_c2(starter, 5)["category"].startswith("edge_case_")   # missing id crashes
+
+def test_t3_empty_list_and_repeats_counted_once():
+    from backend.grader.generic import run_generic
+    assert run_generic(T3_FIXED, "find_duplicate_ids", "whole", [], 5)["result"] == []
+    recs = [{"id": "X"}] * 4 + [{"name": "no id"}]
+    assert run_generic(T3_FIXED, "find_duplicate_ids", "whole", recs, 5)["result"] == ["X"]
+
+def test_new_tasks_variants_stable_and_personal():
+    assert text_task.build_input(text_task.variant_for("L-001")) == text_task.build_input(text_task.variant_for("L-001"))
+    assert dups_task.build_input(dups_task.variant_for("L-001")) != dups_task.build_input(dups_task.variant_for("L-002"))
+
+def test_task_variant_route_generalised(client):
+    for tid in ("t1", "t2", "t3"):
+        r = client.get(f"/tasks/{tid}/variant?learner=L-001")
+        assert r.status_code == 200 and r.json()["starter"] and len(r.json()["criteria"]) == 5
+        assert "expected" not in str(r.json()).lower()
+    assert client.get("/tasks/t9/variant?learner=L-001").status_code == 404
+
+def _run_task(client, task, code, text, learner="L-001"):
+    aid = client.post("/attempts", json={"learner": learner, "mode": "Open", "task": task}).json()["attempt_id"]
+    return client.post(f"/attempts/{aid}/submit", json={"code": code, "text": text}).json()
+
+def test_new_task_full_flow_with_ai_and_per_task_profile(client):
+    client.app.state.llm = good_llm
+    f = text_task.facts(text_task.variant_for("L-001"))
+    text = (f"The bug was that refunded orders were not the issue here but extra spaces and None values broke it, so refunded orders aside, "
+            f"I collapse spaces and return empty for None. {f['changed_count']} strings needed cleaning, so the team should add a check at import.")
+    r = _run_task(client, "t2", T2_FIXED, text)
+    assert r["debugging"] == "Proficient" and r["feedback"]["C4"] == "pass"
+    skills = {s["skill"] for s in client.get("/profile/L-001").json()["skills"]}
+    assert "Text cleaning" in skills and "Insight: Text cleaning" in skills and "Debugging" not in skills
+
+def test_attempt_cap_is_per_task(client):
+    for _ in range(3):
+        assert client.post("/attempts", json={"learner": "L-001", "mode": "Open", "task": "t2"}).status_code == 200
+    assert client.post("/attempts", json={"learner": "L-001", "mode": "Open", "task": "t2"}).status_code == 400
+    assert client.post("/attempts", json={"learner": "L-001", "mode": "Open", "task": "t3"}).status_code == 200
+    assert client.get("/learners/L-001/attempts?task=t2").json()["left"] == 0
+    assert client.get("/learners/L-001/attempts?task=t1").json()["left"] == 3
+
+def test_consent_is_per_task_and_lists_only_shared_skills(client):
+    _run_task(client, "t1", FIXED, good_text())
+    _run_task(client, "t2", T2_FIXED, "short")
+    client.post("/consent", json={"learner": "L-001", "role": "jr-data-analyst", "on": True, "task": "t2"})
+    skills = [s["skill"] for c in client.get("/candidates?min_level=Not%20yet").json()["candidates"] for s in c["skills"]]
+    assert skills and all(s.startswith(("Text cleaning", "Insight: Text cleaning")) for s in skills)
+    assert client.get("/candidates/L-001/receipt?skill=Debugging").status_code == 403       # t1 not shared
+    assert client.get("/candidates/L-001/receipt?skill=Text cleaning").status_code == 200
+    client.post("/consent", json={"learner": "L-001", "role": "jr-data-analyst", "on": False, "task": "t2"})
+    assert client.get("/candidates").json()["candidates"] == []
+
+def test_reset_clears_all_tasks_and_progress_endpoints(client):
+    _run_task(client, "t1", FIXED, good_text()); _run_task(client, "t2", T2_FIXED, "short")
+    client.post("/dev/reset/L-001")
+    assert client.get("/profile/L-001").json()["skills"] == []
+    assert client.get("/learners/L-001/attempts?task=t2").json()["used"] == 0
+    p = client.get("/learners/L-002/progress").json()["courses"]
+    assert p["text-cleaning"]["done"] == 6 and p["pandas"]["done"] == 2
+    client.post("/learners/L-002/progress/pandas/complete")
+    assert client.get("/learners/L-002/progress").json()["courses"]["pandas"]["done"] == 5

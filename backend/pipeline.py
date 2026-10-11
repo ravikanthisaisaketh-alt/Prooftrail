@@ -1,7 +1,7 @@
 """The submission pipeline. Read this file top to bottom: it IS the architecture."""
 import datetime
 from . import db, audit, config
-from .variants import variant_for, build_orders
+from .tasks import TASKS
 from .grader import hidden_tests, intake as intake_mod, ai_checks, explainback, routing
 
 FEEDBACK_TEXT = {   # category -> message. Never contains expected values.
@@ -28,8 +28,7 @@ def _fb(v: dict) -> str:
 def grade(attempt_id: int, llm=None) -> dict:
     c = db.conn()
     a = c.execute("SELECT * FROM attempts WHERE id=?", (attempt_id,)).fetchone()
-    variant = variant_for(a["learner"], config.TASK_VERSION)
-    rows = build_orders(variant)
+    task = TASKS[a["task"] or "t1"]
     results, flags = {}, []
 
     # NOTE: signals (tab leaves, pastes) are NOT read anywhere in this function. By design.
@@ -41,9 +40,7 @@ def grade(attempt_id: int, llm=None) -> dict:
 
     # 2 hidden tests (these decide the code criteria)
     t = config.RUN_TIMEOUT_SECONDS
-    r1 = hidden_tests.check_c1(a["code"], rows, t)
-    r2 = hidden_tests.check_c2(a["code"], t)
-    r4 = hidden_tests.check_c4(a["text"], rows)
+    r1, r2, r4 = task["grade"](a["code"], a["text"], a["learner"], t)
     results["C1"], results["C2"], results["C4"] = r1, r2, r4
 
     # 3 AI checks (C3, C5) only if the answer is not thin and an AI is available
@@ -56,7 +53,7 @@ def grade(attempt_id: int, llm=None) -> dict:
         results["C3"] = results["C5"] = {"pass": False, "category": None, "pending": True}
     else:
         for crit in ("C3", "C5"):
-            out = ai_checks.check(llm, crit, a["text"], config.AI_RUNS)
+            out = ai_checks.check(llm, crit, a["text"], config.AI_RUNS, task["ai_hint"])
             ai_words[crit] = out["result"]
             for i, run in enumerate(out["runs"], 1):
                 if run:
@@ -79,14 +76,14 @@ def grade(attempt_id: int, llm=None) -> dict:
                   (attempt_id, crit, "pass" if r["pass"] else ("pending" if r.get("pending") else "fail"), src, r["category"]))
     for f in flags:
         c.execute("INSERT INTO flags(attempt,type,details) VALUES(?,?,?)", (attempt_id, f, ""))
-    for skill, level, st, conf in (("Debugging", debug_level, "Evidenced", "High"),
-                                    ("Insight Communication", insight, status, confidence)):
+    for skill, level, st, conf in ((task["skill"], debug_level, "Evidenced", "High"),
+                                    (task["insight_skill"], insight, status, confidence)):
         c.execute("INSERT OR REPLACE INTO profiles VALUES(?,?,?,?,?,?,?,?)",
                   (a["learner"], skill, level, st, conf, a["mode"], now, attempt_id))
     c.commit(); c.close()
 
     audit.append("graded", attempt_id, "system",
-                 {"learner": a["learner"], "debugging": debug_level, "insight": insight,
+                 {"learner": a["learner"], "task": task["id"], "debugging": debug_level, "insight": insight,
                   "status": status, "flags": flags, "criteria": {k: v["pass"] for k, v in results.items()}})
 
     feedback = {k: _fb(v) for k, v in results.items()}

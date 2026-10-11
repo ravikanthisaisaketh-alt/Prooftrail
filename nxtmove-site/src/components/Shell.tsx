@@ -7,7 +7,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <div>
       <SimBanner name="NxtMove" />
       <header className="nm-top"><div className="nm-wrap">
-        <span className="nm-logo">Recruiter portal <small>(simulated)</small></span>
+        <span className="nm-logo">NxtMove <small>Recruiter portal · simulated</small></span>
         <nav className="nm-nav" aria-label="Main">
           <NavLink to="/jobs">Jobs</NavLink>
           <NavLink to="/job">Candidates</NavLink>

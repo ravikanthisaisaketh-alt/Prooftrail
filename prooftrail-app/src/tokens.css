@@ -1,0 +1,17 @@
+/* Primitives, semantic aliases and component tokens. */
+:root {
+
+  --white: #fff; --ink: #172b35; --muted: #52616b; --line: #d8e0e5;
+  --space-1: 8px; --space-2: 16px; --space-3: 24px; --space-4: 32px; --space-6: 48px; --space-8: 64px;
+  --font-caption: .875rem; --font-body: 1rem; --font-section: 1.25rem; --font-title: clamp(1.75rem, 3vw, 2rem);
+  --body: system-ui, -apple-system, "Segoe UI", sans-serif; --heading: var(--body);
+  --radius: 12px; --radius-control: 8px; --radius-pill: 999px;
+  --shadow: 0 2px 4px rgb(23 43 53 / 3%), 0 12px 32px rgb(23 43 53 / 5%);
+  --duration-feedback: 160ms; --duration-enter: 240ms; --duration-move: 280ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1); --ease-move: cubic-bezier(.4, 0, .2, 1);
+  --ok: #166044; --ok-l: #e1f3e9; --green: var(--ok); --green-l: var(--ok-l);
+  --bad: #a62525; --bad-l: #fce9e7; --red: var(--bad); --red-l: var(--bad-l);
+  --amber-d: #80500e; --amber-l: #fff2cf; --grey: #47545e; --grey-l: #eaf0f3;
+  --card-padding: var(--space-3); --card-radius: var(--radius); --button-bg: var(--accent); --focus: var(--accent-dark);
+--accent: #087f75; --accent-dark: #08665f; --accent-soft: #e3f3ef; --surface: #fff; --background: linear-gradient(135deg, #d8f3e8 0%, #dceefa 55%, #e6e3fa 100%); --orange: var(--accent); --deep: var(--accent-dark); --cream: #f3f8f7; --soft: var(--accent-soft); --card: var(--surface); --teal: var(--accent); --amber: var(--amber-d);
+}

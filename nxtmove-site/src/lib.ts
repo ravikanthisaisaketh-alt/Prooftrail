@@ -16,3 +16,9 @@ export const JOBS = [
   { id: 'ops-associate', title: 'Operations Associate', company: 'Placeholder Logistics', place: 'Remote (sample)', sample: true,
     blurb: 'Track shipments, spot exceptions and keep the weekly report accurate.' },
 ]
+export const SKILLS: [string, string][] = [
+  ['Debugging', 'Debugging with pandas'], ['Insight Communication', 'Explanation: pandas'],
+  ['Text cleaning', 'Text cleaning'], ['Insight: Text cleaning', 'Explanation: text cleaning'],
+  ['Data structures', 'Data structures'], ['Insight: Data structures', 'Explanation: data structures'],
+]
+export const skillLabel = (s: string) => SKILLS.find(([v]) => v === s)?.[1] ?? s

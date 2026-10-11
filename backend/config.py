@@ -1,5 +1,6 @@
 """Settings in one place. Keys come from .env, never from code."""
 import os
+import secrets
 from dotenv import load_dotenv
 
 load_dotenv()  # reads backend/.env or the folder you run from
@@ -19,3 +20,8 @@ ALLOWED_ORIGINS = [
     os.getenv("PROOFTRAIL_URL", "http://localhost:5174"),
     os.getenv("NXTMOVE_URL", "http://localhost:5175"),
 ]
+
+DEMO_MODE = os.getenv("DEMO_MODE", "0") == "1"       # 1 = allow ?learner= style access with no token (demo/e2e only)
+AUTH_SECRET = os.getenv("AUTH_SECRET") or secrets.token_hex(32)   # missing secret = random per run (tokens die on restart)
+TOKEN_TTL_SECONDS = 8 * 3600
+HANDOFF_TTL_SECONDS = 5 * 60

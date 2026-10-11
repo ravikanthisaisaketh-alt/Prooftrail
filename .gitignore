@@ -5,3 +5,7 @@ node_modules/
 __pycache__/
 .pytest_cache/
 dist/
+.agents/
+.aider-desk/
+skills-lock.json
+presentation-review/
