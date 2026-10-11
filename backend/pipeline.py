@@ -1,6 +1,6 @@
 """The submission pipeline. Read this file top to bottom: it IS the architecture."""
 import datetime
-from . import db, audit, config
+from . import db, audit, config, ratelimit
 from .tasks import TASKS
 from .grader import hidden_tests, intake as intake_mod, ai_checks, explainback, routing
 
@@ -48,7 +48,7 @@ def grade(attempt_id: int, llm=None) -> dict:
     if gate["thin"]:
         ai_words = {"C3": "no", "C5": "no"}
         results["C3"] = results["C5"] = {"pass": False, "category": "thin_answer"}
-    elif llm is None:
+    elif llm is None or not ratelimit.allow_ai(a["learner"]):      # no AI, or the hourly cap is used up: Pending
         ai_words = {"C3": "pending", "C5": "pending"}
         results["C3"] = results["C5"] = {"pass": False, "category": None, "pending": True}
     else:

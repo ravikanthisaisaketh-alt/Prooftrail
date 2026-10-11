@@ -270,7 +270,7 @@ def test_passwords_are_hashed(client):
     assert rows and all("demo-pass" not in h and "$" in h for h in rows)
 
 def test_token_required_and_scoped(client, monkeypatch):
-    monkeypatch.setattr(config, "DEMO_MODE", False)
+    monkeypatch.setattr(config, "ALLOW_TOKENLESS", False)
     assert client.get("/profile/L-001").status_code == 401           # no token
     assert client.get("/profile/L-001", headers={"Authorization": "Bearer junk"}).status_code == 401
     tok = _login(client).json()["token"]
@@ -281,12 +281,12 @@ def test_token_required_and_scoped(client, monkeypatch):
 
 def test_expired_token_rejected(client, monkeypatch):
     from backend import auth
-    monkeypatch.setattr(config, "DEMO_MODE", False)
+    monkeypatch.setattr(config, "ALLOW_TOKENLESS", False)
     tok = auth.make_token("L-001", ttl=-1)
     assert client.get("/auth/me", headers={"Authorization": f"Bearer {tok}"}).status_code == 401
 
 def test_handoff_single_use_and_not_an_access_token(client, monkeypatch):
-    monkeypatch.setattr(config, "DEMO_MODE", False)
+    monkeypatch.setattr(config, "ALLOW_TOKENLESS", False)
     tok = _login(client).json()["token"]
     ho = client.post("/auth/handoff", headers={"Authorization": f"Bearer {tok}"}).json()["handoff"]
     assert client.get("/auth/me", headers={"Authorization": f"Bearer {ho}"}).status_code == 401   # handoff is not a session
@@ -390,3 +390,117 @@ def test_reset_clears_all_tasks_and_progress_endpoints(client):
     assert p["text-cleaning"]["done"] == 6 and p["pandas"]["done"] == 2
     client.post("/learners/L-002/progress/pandas/complete")
     assert client.get("/learners/L-002/progress").json()["courses"]["pandas"]["done"] == 5
+
+
+# ---- runner hardening ----
+def test_submission_sees_no_secrets(monkeypatch):
+    """A submission that prints os.environ and returns its size must see nothing, and no secret may reach stdout."""
+    from backend.grader import sandbox
+    monkeypatch.setenv("LLM_API_KEY", "SECRET-LLM-KEY-123")
+    monkeypatch.setenv("AUTH_SECRET", "SECRET-AUTH-456")
+    code = 'import os\nprint(dict(os.environ))\nprint(os.environ.get("LLM_API_KEY"), os.environ.get("AUTH_SECRET"), os.environ.get("PATH"))\ndef monthly_revenue(df):\n    return {"vars": float(len(os.environ))}\n'
+    raw = sandbox.run_raw(sandbox_tail_pandas(), code, {"rows": []}, 10)
+    assert "SECRET-LLM-KEY-123" not in raw["stdout"] and "SECRET-AUTH-456" not in raw["stdout"]
+    from backend.grader.runner import run_learner
+    out = run_learner(code, [], 10)
+    assert out["ok"] and out["result"]["vars"] == 0.0
+
+def sandbox_tail_pandas():
+    from backend.grader import runner
+    return runner.TAIL
+
+def test_submission_cannot_use_network():
+    from backend.grader.runner import run_learner
+    code = ('import socket\ndef monthly_revenue(df):\n    try:\n        socket.create_connection(("1.1.1.1", 80), 1)\n        return {"net": 1.0}\n'
+            '    except Exception:\n        return {"net": 0.0}\n')
+    out = run_learner(code, [], 10)
+    assert out["ok"] and out["result"]["net"] == 0.0
+
+def test_memory_hog_is_stopped():
+    from backend.grader.runner import run_learner
+    code = 'def monthly_revenue(df):\n    x = bytearray(6 * 1024 * 1024 * 1024)\n    return {"ok": 1.0}\n'
+    out = run_learner(code, [], 10)
+    assert not out["ok"] and out["category"] == "crashed"
+
+def test_runner_uses_a_temp_dir_that_is_removed():
+    import os
+    from backend.grader.runner import run_learner
+    code = 'import os\ndef monthly_revenue(df):\n    open("scratch.txt", "w").write("x")\n    return {"files": float(len(os.listdir(".")))}\n'
+    assert run_learner(code, [], 10)["ok"]
+    assert not os.path.exists("scratch.txt")                 # written in the temp dir, not in our working directory
+
+
+# ---- deployment settings ----
+def test_cors_origins_parse_and_default(monkeypatch):
+    assert config.parse_origins("https://a.vercel.app, https://b.vercel.app/ ,") == ["https://a.vercel.app", "https://b.vercel.app"]
+    assert config.parse_origins("") == []
+    assert "http://localhost:5173" in config.ALLOWED_ORIGINS or config.os.getenv("CORS_ORIGINS")   # localhost when unset
+
+def test_cors_header_follows_allowed_origins(client):
+    ok = client.get("/health", headers={"Origin": "http://localhost:5173"})
+    assert ok.headers.get("access-control-allow-origin") == "http://localhost:5173"
+    bad = client.get("/health", headers={"Origin": "https://evil.example"})
+    assert "access-control-allow-origin" not in bad.headers
+
+
+# ---- demo safety: reset routes and AI caps ----
+def test_reset_routes_only_in_demo_mode(client, monkeypatch):
+    monkeypatch.setattr(config, "DEMO_MODE", False)
+    tok = _login(client).json()["token"]
+    h = {"Authorization": f"Bearer {tok}"}
+    assert client.post("/dev/reset", headers=h).status_code == 404
+    assert client.post("/dev/reset/L-001", headers=h).status_code == 404
+    monkeypatch.setattr(config, "DEMO_MODE", True)
+    assert client.post("/dev/reset/L-001", headers=h).status_code == 200
+    assert client.post("/dev/reset/L-002", headers=h).status_code == 403     # still own data only
+
+def test_global_reset_needs_sign_in_and_key(client, monkeypatch):
+    monkeypatch.setattr(config, "ALLOW_TOKENLESS", False)
+    assert client.post("/dev/reset").status_code == 401
+    tok = _login(client).json()["token"]
+    h = {"Authorization": f"Bearer {tok}"}
+    monkeypatch.setattr(config, "RESET_KEY", "k1")
+    assert client.post("/dev/reset", headers=h).status_code == 403
+    assert client.post("/dev/reset", headers={**h, "X-Reset-Key": "k1"}).status_code == 200
+
+def test_ai_cap_per_learner_falls_back_to_pending(client, monkeypatch):
+    monkeypatch.setattr(config, "AI_CAP_PER_LEARNER_PER_HOUR", 1)
+    client.app.state.llm = good_llm
+    _, r1 = submit(client, FIXED, good_text())
+    _, r2 = submit(client, FIXED, good_text())
+    assert r1.json()["status"] == "Evidenced" and r1.json()["feedback"]["C3"] == "pass"
+    b = r2.json()
+    assert b["status"] == "Needs human review" and b["feedback"]["C3"].startswith("Pending")   # capped: never a pass
+    assert b["debugging"] == "Proficient"                                                      # tests still grade
+
+def test_ai_cap_overall(client, monkeypatch):
+    monkeypatch.setattr(config, "AI_CAP_TOTAL_PER_HOUR", 1)
+    client.app.state.llm = good_llm
+    _, a = submit(client, FIXED, good_text("L-001"), learner="L-001")
+    _, b = submit(client, FIXED, good_text("L-002"), learner="L-002")
+    assert a.json()["feedback"]["C3"] == "pass" and b.json()["feedback"]["C3"].startswith("Pending")
+
+def test_thin_answers_do_not_use_the_cap(client, monkeypatch):
+    monkeypatch.setattr(config, "AI_CAP_PER_LEARNER_PER_HOUR", 1)
+    client.app.state.llm = good_llm
+    submit(client, FIXED, "too short")
+    _, r = submit(client, FIXED, good_text())
+    assert r.json()["feedback"]["C3"] == "pass"
+
+
+# ---- startup seeding ----
+def test_seeds_demo_data_on_an_empty_database(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "fresh.db"))        # no file at all, like a fresh free-host disk
+    monkeypatch.setattr(config, "LLM_API_KEY", "")
+    from backend.main import app
+    with TestClient(app) as c:
+        assert c.post("/auth/login", json={"login": "L-003", "password": "demo-pass-3"}).status_code == 200
+        tok = c.post("/auth/login", json={"login": "L-001", "password": "demo-pass-1"}).json()["token"]
+        prog = c.get("/learners/L-001/progress", headers={"Authorization": f"Bearer {tok}"}).json()["courses"]
+        assert prog["pandas"]["done"] == 5 and prog["text-cleaning"]["done"] == 3
+
+def test_seeding_never_wipes_existing_data(client):
+    client.post("/consent", json={"learner": "L-001", "role": "jr-data-analyst", "on": True})
+    assert db.seed_if_empty() is False
+    assert client.get("/consent/L-001/history").json()["on"] is True

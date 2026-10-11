@@ -1,5 +1,8 @@
 // One place for every call to the back end. URLs come from .env, never hard-coded.
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+// Site and API addresses come from VITE_ env vars. The localhost fallbacks apply to `npm run dev` only.
+const fromEnv = (v: string | undefined, devDefault: string): string => v || devDefault
+const API = fromEnv(import.meta.env.VITE_API_URL, import.meta.env.DEV ? 'http://localhost:8000' : '')
+if (import.meta.env.PROD && !API) console.error('Set VITE_API_URL for this build.')
 
 import { getToken, clearSession } from './session'
 
@@ -72,10 +75,11 @@ export function useTask(): string {
   try { if (p) sessionStorage.setItem('pt_task', p); return p ?? sessionStorage.getItem('pt_task') ?? 't1' } catch { return p ?? 't1' }
 }
 
-export const NYERAS_URL = (import.meta.env.VITE_NYERAS_URL as string | undefined) ?? 'http://localhost:5173'
-export const NXTMOVE_URL = (import.meta.env.VITE_NXTMOVE_URL as string | undefined) ?? 'http://localhost:5175'
-// Only allow returning to the Nyeras site (no open redirect).
+export const NYERAS_URL = fromEnv(import.meta.env.VITE_NYERAS_URL, import.meta.env.DEV ? 'http://localhost:5173' : '')
+export const NXTMOVE_URL = fromEnv(import.meta.env.VITE_NXTMOVE_URL, import.meta.env.DEV ? 'http://localhost:5175' : '')
+// Only allow returning to the Nyeras site (same origin as VITE_NYERAS_URL). No open redirect, and no redirect if it is unset.
 export function useReturnUrl(): string {
+  const fallback = `${NYERAS_URL}/profile`
   const r = new URLSearchParams(window.location.search).get('return')
-  return r && r.startsWith(NYERAS_URL) ? r : `${NYERAS_URL}/profile`
+  try { return r && NYERAS_URL && new URL(r).origin === new URL(NYERAS_URL).origin ? r : fallback } catch { return fallback }
 }

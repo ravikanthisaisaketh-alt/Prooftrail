@@ -44,9 +44,21 @@ export default function Attempt({ learner }: { learner: string }) {
   useEffect(() => { loadLeft() }, [learner, task])
   useEffect(() => { api.taskVariant(learner, task).then((v) => { setInfo(v); setCode(v.starter) }).catch((e) => setError(e.message)) }, [learner, task])
 
+  // Focus mode blocks pasting and dropping text into the editor and the explanation box. Attempts are logged, never graded.
+  const focus = mode === 'Focus'
+  const refuse = (pasted = '') => { log.onPaste(pasted); log.onBlocked(); toast('Paste is turned off in Focus mode. Please type your answer.') }
   const pasteHandler = EditorView.domEventHandlers({
-    paste: (e) => { log.onPaste(e.clipboardData?.getData('text') ?? '') ; return false },
+    paste: (e) => { if (!focus) { log.onPaste(e.clipboardData?.getData('text') ?? ''); return false } e.preventDefault(); refuse(e.clipboardData?.getData('text') ?? ''); return true },
+    drop: (e) => { if (!focus) return false; e.preventDefault(); refuse(e.dataTransfer?.getData('text') ?? ''); return true },
+    beforeinput: (e) => {            // also catches paste from the context menu and other routes
+      if (focus && /^insertFrom(Paste|Drop|Yank)/.test((e as InputEvent).inputType)) { e.preventDefault(); refuse(); return true }
+      return false
+    },
   })
+  const blockText = (e: { preventDefault: () => void; clipboardData?: DataTransfer | null; dataTransfer?: DataTransfer | null }) => {
+    if (!focus) return
+    e.preventDefault(); refuse((e.clipboardData ?? e.dataTransfer)?.getData('text') ?? '')
+  }
 
   async function start() {
     setBusy(true)
@@ -108,7 +120,7 @@ export default function Attempt({ learner }: { learner: string }) {
             {counter}
           </div>
           <p className="muted" style={{ marginTop: 10 }}>{mode === 'Focus'
-            ? 'Focus mode logs tab leaves and large pastes. You can see the log. It never blocks you and never changes your level.'
+            ? 'Focus mode blocks pasting and logs tab leaves. You can see the log. It never changes your level.'
             : 'Open mode: use any tools you like and tell us what you used.'}</p>
           <button onClick={start} className="btn" disabled={busy}>{busy ? 'Starting...' : 'Start attempt'}</button>
           {error && !limitHit && <div style={{ marginTop: 10 }}><ErrorBox message={error} onRetry={start} /></div>}
@@ -121,10 +133,10 @@ export default function Attempt({ learner }: { learner: string }) {
             <h2>Your fix</h2>
             <div className="row">{mode === 'Focus' && <span className="chip warn pulse">Focus mode on</span>}{counter}</div>
           </div>
-          {mode === 'Focus' && <p className="muted">Focus log (only you and reviewers see it): tab leaves {log.leaves}, large pastes {log.pastes}</p>}
+          {mode === 'Focus' && <p className="muted">Focus log (only you and reviewers see it): tab leaves {log.leaves}, paste attempts blocked {log.blocked}. Pasting is turned off in Focus mode.</p>}
           <div className="cm-wrap"><CodeMirror value={code} height="260px" extensions={[python(), pasteHandler, EditorView.contentAttributes.of({ 'aria-label': 'Your Python code' })]} onChange={setCode} /></div>
           <label htmlFor="explain" style={{ display: 'block', margin: '14px 0 6px', fontWeight: 600 }}>Explain your fix in 2 or 3 sentences</label>
-          <textarea id="explain" className="pt-text" value={text} onChange={(e) => setText(e.target.value)} rows={5}
+          <textarea id="explain" className="pt-text" value={text} onPaste={blockText} onDrop={blockText} onBeforeInput={(e) => { const t = (e.nativeEvent as InputEvent).inputType ?? ''; if (focus && /^insertFrom(Paste|Drop|Yank)/.test(t)) { e.preventDefault(); refuse() } }} onChange={(e) => setText(e.target.value)} rows={5}
             placeholder="What was the cause, why does your fix work, and what should the team do next?" />
           <div style={{ marginTop: 12 }}>
             <button onClick={submit} className={`btn ${result ? 'ghost' : ''}`} disabled={busy}>{busy ? 'Grading...' : 'Submit for grading'}</button>

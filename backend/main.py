@@ -1,16 +1,19 @@
 """FastAPI routes. Thin on purpose: real work lives in pipeline.py, audit.py, consent.py."""
+import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Optional
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from . import db, config, audit, pipeline
+from . import db, config, audit, pipeline, ratelimit
 from .tasks import TASKS, SKILL_TASK, COURSES
 
 @asynccontextmanager
 async def lifespan(_app):
-    if not _db_ready():
-        db.reset()        # first run: create tables and the two sample learners
+    if not os.getenv("AUTH_SECRET"):
+        logging.getLogger("prooftrail").warning("AUTH_SECRET is not set: using a random one, so logins end when the server restarts.")
+    db.seed_if_empty()        # first run, or a fresh disk: tables plus demo users, courses and progress
     if config.LLM_API_KEY:
         from .llm import llm
         app.state.llm = llm
@@ -39,10 +42,10 @@ def current_user(request: Request) -> str | None:
 
 
 def require_learner(request: Request, learner: str) -> None:
-    """401 if the token is bad, 403 if it belongs to someone else. No header is allowed only in DEMO_MODE."""
+    """401 if the token is bad, 403 if it belongs to someone else. No header is allowed only when ALLOW_TOKENLESS=1."""
     who = current_user(request)
     if who is None:
-        if config.DEMO_MODE:
+        if config.ALLOW_TOKENLESS:
             return
         raise HTTPException(401, "Please sign in.")
     if who != learner:
@@ -104,13 +107,6 @@ def exchange(body: ExchangeIn):
 
 
 
-def _db_ready() -> bool:
-    try:
-        c = db.conn(); c.execute("SELECT task FROM attempts LIMIT 1"); c.execute("SELECT 1 FROM users LIMIT 1"); c.close(); return True
-    except Exception:
-        return False
-
-
 class StartIn(BaseModel):
     learner: str
     mode: str = Field(pattern="^(Open|Focus)$")
@@ -130,9 +126,21 @@ class SignalIn(BaseModel):
 def health():
     return {"api": "ok", "ai": "configured" if app.state.llm else "off", "model": config.LLM_MODEL if app.state.llm else None}
 
+def demo_only() -> None:
+    """The reset routes exist only when DEMO_MODE=1. Otherwise they look like they are not there."""
+    if not config.DEMO_MODE:
+        raise HTTPException(404, "Not found")
+
+
 @app.post("/dev/reset")
-def dev_reset():
-    db.reset(); return {"reset": True}
+def dev_reset(request: Request):
+    demo_only()
+    # Wipes EVERYONE's data: a valid sign-in is required, plus RESET_KEY if one is configured.
+    if current_user(request) is None and not config.ALLOW_TOKENLESS:
+        raise HTTPException(401, "Please sign in.")
+    if config.RESET_KEY and request.headers.get("X-Reset-Key") != config.RESET_KEY:
+        raise HTTPException(403, "Reset key required.")
+    db.reset(); ratelimit.clear(); return {"reset": True}
 
 @app.get("/tasks/{task_id}/variant")
 def task_variant(task_id: str, learner: str, request: Request):
@@ -212,6 +220,7 @@ def attempts_used(learner: str, request: Request, task: str = "t1"):
 
 @app.post("/dev/reset/{learner}")
 def dev_reset_learner(learner: str, request: Request):
+    demo_only()
     require_learner(request, learner)
     """Demo helper: clear one learner's attempts, results and consent so the demo can be repeated."""
     c = db.conn()
@@ -343,6 +352,8 @@ def post_explainback(aid: int, body: AnswersIn, request: Request):
     require_learner(request, attempt_learner(aid))
     if app.state.llm is None:
         raise HTTPException(503, "The AI check is not available right now. Your answers were not judged.")
+    if not ratelimit.allow_ai(attempt_learner(aid)):
+        raise HTTPException(503, "The AI check has reached its hourly limit for this demo. Your answers were not judged.")
     c = db.conn()
     a = c.execute("SELECT code, learner, task FROM attempts WHERE id=?", (aid,)).fetchone()
     c3 = c.execute("SELECT result FROM criterion_results WHERE attempt=? AND criterion='C3'", (aid,)).fetchone()
@@ -361,7 +372,7 @@ def challenge(body: ChallengeIn):
     """Attack the Grader: shows what the safety layers do. Saves NOTHING."""
     gate = intake_mod.intake(body.text)
     out = {"thin": gate["thin"], "instruction_like": gate["instruction_like"], "ai": None}
-    if not gate["thin"] and app.state.llm is not None:
+    if not gate["thin"] and app.state.llm is not None and ratelimit.allow_ai("challenge", per_limit=None):
         res = ai_checks.check(app.state.llm, "C3", body.text, config.AI_RUNS)
         out["ai"] = {"result": res["result"], "answers": [r["answer"] if r else None for r in res["runs"]]}
     flags = ["instruction_like"] if gate["instruction_like"] else []

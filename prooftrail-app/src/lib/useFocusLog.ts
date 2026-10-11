@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from './api'
 
-// Focus mode only. Open, never blocks, never changes a level. Counts and seconds only: no keystrokes.
+// Focus mode only. Pasting is blocked (see Attempt.tsx); blocked attempts are counted so the learner sees them.
+// Never changes a level. Counts and seconds only: no keystrokes.
 export function useFocusLog(attemptId: number | null, enabled: boolean) {
   const [leaves, setLeaves] = useState(0)
   const [pastes, setPastes] = useState(0)
+  const [blocked, setBlocked] = useState(0)
   const leftAt = useRef<number | null>(null)
 
   useEffect(() => {
@@ -29,5 +31,7 @@ export function useFocusLog(attemptId: number | null, enabled: boolean) {
     setPastes((n) => n + 1)
     api.sendSignal(attemptId, 'large_paste', text.length, note ?? '').catch(() => {})
   }
-  return { leaves, pastes, onPaste }
+  // Every blocked paste or drop attempt, any size.
+  const onBlocked = () => setBlocked((n) => n + 1)
+  return { leaves, pastes, blocked, onPaste, onBlocked }
 }

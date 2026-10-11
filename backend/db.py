@@ -44,6 +44,24 @@ def conn() -> sqlite3.Connection:
     return c
 
 
+def seed_if_empty() -> bool:
+    """Make sure the tables and the demo data exist. Never wipes existing data. Returns True if it seeded.
+    The free host resets its disk on every restart, so this runs at startup."""
+    try:
+        c = conn()
+        c.execute("SELECT task FROM attempts LIMIT 1")             # an old schema without these columns gets rebuilt
+        c.execute("SELECT 1 FROM consents WHERE task IS NULL LIMIT 1")
+        n = c.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        c.close()
+    except Exception:
+        reset()
+        return True
+    if n == 0:
+        reset()
+        return True
+    return False
+
+
 def reset() -> None:
     c = conn()
     names = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]

@@ -1,5 +1,5 @@
 // Who is the learner? Always from a signed token, never from the URL (except DEMO mode with no token).
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+const API = (import.meta.env.VITE_API_URL as string | undefined) || (import.meta.env.DEV ? 'http://localhost:8000' : '')
 const KEY = 'pt_token'
 let memToken: string | null = null
 

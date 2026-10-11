@@ -40,3 +40,20 @@ Done: `motion` package (v14) with src/motion.ts (fast .18, base .28, page .4, ea
 Honest limits: the stepper cannot show real per-step timing (the back end answers once), so it spins on step 1 and completes the steps when the answer arrives. AI run dots are derived from the result (all agree = green, a disagreement flag = amber, AI off = grey), not from per-run data. The Attack page cannot run hidden tests, so it states that text cannot change C1/C2 rather than measuring it. The Doubt panel lists the grader's rules, not per-check reasons (the route returns counts only). Nyeras and NxtMove were not restyled.
 Skills named in the request (frontend-design, web-design-guidelines, emil-design-eng, ui-ux-pro-max, review-animations) are not available in this environment, so their guidance was applied by hand and motion was audited manually.
 Verified: all three sites build, pytest 41 passed, e2e ALL PASSED, headless Chrome flow (handoff, grading stepper, result, consent expand/collapse, verify, quality, challenge flag to review queue, 390px) with no page or console errors and no horizontal overflow at 390px.
+
+## Focus mode now blocks pasting (design change)
+The plan said Focus mode must never block. By request it now blocks paste and drop into the code editor and the explanation box (paste event, drop, and beforeinput insertFromPaste/Drop/Yank, so context-menu paste is covered). Typing still works. Each blocked attempt shows a toast and is counted ("paste attempts blocked N"); pastes of 200+ characters are still logged as large_paste signals. Signals still never change a level. Open mode is unchanged.
+Limits: this is a browser-side control only. It does not stop someone retyping text from another window, using devtools, or sending requests to the API directly, and it does not block copying. Verified with a real Ctrl+V in headless Chrome: Focus blocked both boxes, Open allowed both; no back end change.
+
+## Public-demo hardening
+Done (pytest 54 passed, e2e ALL PASSED after each step; all three sites build):
+1. Runner: backend/grader/sandbox.py runs both runners with an EMPTY environment (cleared again before the learner module is imported), hard timeout, CPU/memory/file-size/open-file limits, no core dumps, a temp working dir, and no network (own network namespace via unshare when the host allows it, plus Python sockets disabled). New tests: no secrets visible, no network, memory hog stopped, temp dir only.
+2. CORS_ORIGINS (comma separated) with localhost defaults; blank env values mean the default.
+3. /dev/reset routes exist only when DEMO_MODE=1 (404 otherwise); the wipe-everything /dev/reset also needs a sign-in and, if set, RESET_KEY. AI caps: 30 uses per hour overall, 5 per learner (env-tunable); over the cap the AI criteria show Pending and tests still grade. Thin answers do not use the cap.
+4. db.seed_if_empty() runs at startup: tables plus demo users and course progress when the database is empty, never wipes existing data.
+5. vercel.json (rewrite all paths to /index.html) in all three sites.
+6. Every site and API address comes from VITE_ env vars; localhost fallbacks only exist in `npm run dev` (production bundles contain none). ProofTrail only accepts a return link on the VITE_NYERAS_URL origin.
+7. render.yaml; 8. README Deploy section and full env table; blank-valued .env.example files.
+Behaviour change to know about: DEMO_MODE now ONLY controls the reset routes. Tokenless access moved to ALLOW_TOKENLESS (default 0), so a public demo with DEMO_MODE=1 still requires login.
+Not verified: nothing was deployed to Render or Vercel, so the Blueprint, the Vercel project settings and CORS between real hosts are untested. The network namespace may be unavailable on Render (the socket block then is the only network control). Limits are not a real sandbox.
+Test notes: my browser regression script has two known test-side flakes (it clicks the first See evidence button, which is the explanation skill, and it checks for Locked before progress loads); neither is an app bug.

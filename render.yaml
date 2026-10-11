@@ -1,0 +1,30 @@
+# Render Blueprint for the ProofTrail API (FastAPI + SQLite). The three front ends go on Vercel.
+services:
+  - type: web
+    name: prooftrail-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: AUTH_SECRET            # signs login tokens; Render generates a long random value
+        generateValue: true
+      - key: LLM_API_KEY            # Gemini key. Leave empty to run with AI off.
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: CORS_ORIGINS           # the three Vercel URLs, comma separated, no trailing slash
+        sync: false
+      - key: DEMO_MODE              # 1 = the Reset demo routes work. Public demo only.
+        value: "1"
+      - key: ALLOW_TOKENLESS        # keep 0: every learner request needs a login token
+        value: "0"
+      - key: RESET_KEY              # optional: extra key for the wipe-everything reset route
+        sync: false
+      - key: AI_CAP_TOTAL_PER_HOUR
+        value: "30"
+      - key: AI_CAP_PER_LEARNER_PER_HOUR
+        value: "5"

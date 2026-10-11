@@ -1,6 +1,10 @@
-export const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
-export const PROOFTRAIL = import.meta.env.VITE_PROOFTRAIL_URL ?? 'http://localhost:5174'
-export const NYERAS = import.meta.env.VITE_NYERAS_URL ?? 'http://localhost:5173'
+// Site and API addresses come from VITE_ env vars. The localhost fallbacks apply to `npm run dev` only,
+// so a production build that is missing a variable fails loudly instead of quietly calling localhost.
+const fromEnv = (v: string | undefined, devDefault: string): string => v || devDefault
+export const API = fromEnv(import.meta.env.VITE_API_URL, import.meta.env.DEV ? 'http://localhost:8000' : '')
+export const PROOFTRAIL = fromEnv(import.meta.env.VITE_PROOFTRAIL_URL, import.meta.env.DEV ? 'http://localhost:5174' : '')
+export const NYERAS = fromEnv(import.meta.env.VITE_NYERAS_URL, import.meta.env.DEV ? 'http://localhost:5173' : '')
+if (import.meta.env.PROD && (!API || !PROOFTRAIL)) console.error('Set VITE_API_URL and VITE_PROOFTRAIL_URL for this build.')
 
 // Session token: kept in memory and in sessionStorage (cleared when the tab closes).
 let memToken: string | null = null
